@@ -1170,10 +1170,21 @@
 
     async function pollTiltify() {
       try {
-        const r = await fetch(`${API}/api/public/campaigns/${CAMPAIGN_ID}/donations?limit=25`, { headers: { 'Authorization': `Bearer ${cfg.token}` } });
+        const r = await fetch(`${API}/api/public/campaigns/${CAMPAIGN_ID}/donations?limit=100`, { headers: { 'Authorization': `Bearer ${cfg.token}` } });
         if (!r.ok) { setStatus(`API ${r.status}`, true); return; }
         const j = await r.json(), list = j.data || [];
-        if (!S.initialized) { list.forEach(d => { S.seenIds.add(d.id); S.totalRaised += parseFloat(d.amount?.value ?? d.amount ?? 0); }); S.initialized = true; updateDisplay(); setStatus('● LIVE · polling every 10s', false); return; }
+        if (!S.initialized) { 
+          // Get current total on first launch
+          const totalRes = await fetch(`${API}/api/public/campaigns/${CAMPAIGN_ID}`, { headers: { 'Authorization': `Bearer ${cfg.token}` } });
+          const tj = await totalRes.json();
+          S.totalRaised = parseFloat(tj.data.total_amount_raised.value ?? tj.data.total_amount_raised.value ?? 0);
+
+          list.forEach(d => { S.seenIds.add(d.id); });
+          S.initialized = true; 
+          updateDisplay(); 
+          setStatus('● LIVE · polling every 10s', false); 
+          return; 
+        }
         list.filter(d => !S.seenIds.has(d.id)).reverse().forEach(d => { S.seenIds.add(d.id); processDonation(parseFloat(d.amount?.value ?? d.amount ?? 0), d.donor_name || 'Anonymous'); });
       } catch (e) { setStatus('CORS error — see readme', true); }
     }
